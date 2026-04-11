@@ -11,18 +11,21 @@ namespace ConsoleApp1
         {
             Arena arena = new Arena();
 
-            arena.Work();
+            arena.Run();
         }
     }
 
-    
+
     public static class UserUtils
     {
         private static Random _random = new Random();
+        public const int MinRandomNumber = 1;
+        public const int MaxRandomNumber = 101;
 
-        public static int GenerateRandomNumber(int min, int max)
+
+        public static int GenerateRandomNumber()
         {
-            return _random.Next(min, max);
+            return _random.Next(MinRandomNumber, MaxRandomNumber);
         }
 
     }
@@ -30,7 +33,7 @@ namespace ConsoleApp1
     class Arena
     {
         private const int FightCommand = 1;
-        private const int ExitCommand =2;
+        private const int ExitCommand = 2;
 
         private List<Fighter> _fighters;
 
@@ -45,9 +48,9 @@ namespace ConsoleApp1
             _fighters.Add(new Monk(50, 1200, 100));
         }
 
-        public void Work()
+        public void Run()
         {
-            
+
             bool isWorking = true;
 
             while (isWorking)
@@ -71,7 +74,7 @@ namespace ConsoleApp1
                             isWorking = false;
                             break;
                     }
-                }  
+                }
             }
         }
 
@@ -81,16 +84,16 @@ namespace ConsoleApp1
             Console.WriteLine($"{second.TypeFighter}: {second.Health} HP");
             Console.WriteLine("----------------------");
         }
-        public void StartFight(Fighter firstFighter,Fighter secondFighter)
+        public void StartFight(Fighter firstFighter, Fighter secondFighter)
         {
-            while (firstFighter.IsAlive()&& secondFighter.IsAlive())
+            while (firstFighter.IsAlive && secondFighter.IsAlive)
             {
                 firstFighter.ProcessBurn();
                 secondFighter.ProcessBurn();
 
                 firstFighter.Attack(secondFighter);
 
-                if (secondFighter.IsAlive())
+                if (secondFighter.IsAlive)
                 {
                     secondFighter.Attack(firstFighter);
                 }
@@ -98,7 +101,7 @@ namespace ConsoleApp1
 
                 ShowFightersHealth(firstFighter, secondFighter);
             }
-            if (firstFighter.IsAlive())
+            if (firstFighter.IsAlive)
             {
                 ShowWinner(firstFighter);
             }
@@ -136,7 +139,7 @@ namespace ConsoleApp1
         {
             Console.Clear();
 
-            Console.ForegroundColor=ConsoleColor.Yellow;
+            Console.ForegroundColor = ConsoleColor.Yellow;
             Console.WriteLine("===================================");
             Console.WriteLine($"        ПОБЕДИЛ {fighter.TypeFighter}");
             Console.WriteLine("===================================");
@@ -151,7 +154,7 @@ namespace ConsoleApp1
 
                 if (int.TryParse(chooseFighter, out int index) && IsValidIndex(index))
                 {
-                    return _fighters[index-1];
+                    return _fighters[index - 1].Copy();
                 }
 
                 Console.WriteLine("неверный выбор попробуйте еще!");
@@ -160,12 +163,12 @@ namespace ConsoleApp1
 
         private bool IsValidIndex(int index)
         {
-            return index>0&&index<=_fighters.Count;
+            return index > 0 && index <= _fighters.Count;
         }
 
         public void ShowFighters()
         {
-            for(int i=0;i<_fighters.Count;i++)
+            for (int i = 0; i < _fighters.Count; i++)
             {
                 Console.WriteLine($"{i + 1}-{_fighters[i].TypeFighter}");
             }
@@ -174,9 +177,9 @@ namespace ConsoleApp1
 
     abstract class Fighter
     {
-        private int _burnDamage = 0; 
+        private int _burnDamage = 0;
         private int _burnTurns = 0;
-        
+
         public Fighter(int armor, int health, int damage, string typeFighter)
         {
             Armor = armor;
@@ -186,15 +189,19 @@ namespace ConsoleApp1
             MaxHealth = health;
         }
 
-        protected int MaxHealth { get; private set; }
-        public int Armor {  get; private set; }
+        public int Armor { get; private set; }
         public int Health { get; private set; }
         public int Damage { get; private set; }
         public string TypeFighter { get; private set; }
+        public bool IsAlive => Health > 0;
+        protected int MaxHealth { get; private set; }
+
+        public abstract Fighter Copy();
+
 
         public void ApplyBurn(int damage, int turns)
         {
-            _burnDamage = damage; _burnTurns=turns;
+            _burnDamage = damage; _burnTurns = turns;
         }
 
         public void ProcessBurn()
@@ -215,22 +222,17 @@ namespace ConsoleApp1
         }
         public virtual void Attack(Fighter enemy)
         {
-            enemy.TakeDamage(Damage);  
+            enemy.TakeDamage(Damage);
         }
 
         public virtual void TakeDamage(int damage)
         {
-            int finalDamage = damage-Armor;
+            int finalDamage = damage - Armor;
             if (finalDamage < 0)
             {
                 finalDamage = 0;
             }
-            Health-=finalDamage;
-        }
-
-        public bool IsAlive()
-        {
-            return Health > 0;
+            Health -= finalDamage;
         }
 
         protected void Heal(int amount)
@@ -241,30 +243,40 @@ namespace ConsoleApp1
         }
     }
 
-    class Mage:Fighter
+    class Mage : Fighter
     {
-        private const int FireballCost = 33;
+        private const int FireballCost = 50;
         private const int FireballDamage = 280;
+        private const int MaxMana = 100;
+        private const int ManaRegen = 20;
 
-        private int _mana = 100;
-        private int _skipTurns = 0;
-        
-        public Mage(int armor,int health,int damage) : base(armor, health, damage, "МАГ")
-        {  
-            
+        private float _burnPercent = 0.1f;
+        private int _burnDuration = 3;
+        private int _mana = MaxMana;
+
+
+        public Mage(int armor, int health, int damage) : base(armor, health, damage, "МАГ") { }
+
+        public override Fighter Copy()
+        {
+            return new Mage(Armor, MaxHealth, Damage);
+        }
+
+        public override void Reset()
+        {
+            base.Reset();
+            _mana = MaxMana;
         }
 
         public override void Attack(Fighter enemy)
         {
-            if (_skipTurns > 0)
+            _mana += ManaRegen;
+            if (_mana > MaxMana)
             {
-                Console.WriteLine($"{TypeFighter} копит манну и не может пока атаковать");
-                _skipTurns--;
-                _mana += 20;
-                return;
+                _mana = MaxMana;
             }
 
-            if( _mana >= FireballCost)
+            if (_mana >= FireballCost)
             {
                 _mana -= FireballCost;
 
@@ -272,40 +284,45 @@ namespace ConsoleApp1
 
                 enemy.TakeDamage(FireballDamage);
 
-                int burnDamage = (int)(FireballDamage * 0.1);
-                enemy.ApplyBurn(burnDamage, 3);
+                int burnDamage = (int)(FireballDamage * _burnPercent);
+                enemy.ApplyBurn(burnDamage, _burnDuration);
             }
+
             else
             {
-                Console.WriteLine($"{TypeFighter} не хватает маны и он пропускает 2 хода");
+                Console.WriteLine($"{TypeFighter} не хватает маны и он атакуюет палочкой");
 
-                _skipTurns = 2;
+                enemy.TakeDamage(Damage);
+
             }
         }
     }
 
     class Barbarian : Fighter
     {
-        
+        private const double RageStackBonus = 0.1;
+        public Barbarian(int armor, int health, int damage) : base(armor, health, damage, "ВАРВАР") { }
 
-        public Barbarian(int armor,int health,int damage):base(armor, health, damage, "ВАРВАР")
+        public override Fighter Copy()
         {
+            return new Barbarian(Armor, MaxHealth, Damage);
         }
 
         public override void Attack(Fighter enemy)
         {
-            int lostHealth= MaxHealth - Health;
-            int stackRage = lostHealth/100;
-            
-            if (stackRage >= 5)
+            int lostHealth = MaxHealth - Health;
+            int stackRage = lostHealth / 100;
+            int maxStackRage = 5;
+
+            if (stackRage >= maxStackRage)
             {
-                stackRage = 5; 
+                stackRage = maxStackRage;
             }
 
-            double bonusDamage = Damage * stackRage * 0.1;
-            double finalDamage = bonusDamage+Damage;
+            double bonusDamage = Damage * stackRage * RageStackBonus;
+            double finalDamage = bonusDamage + Damage;
 
-           enemy.TakeDamage((int)finalDamage);
+            enemy.TakeDamage((int)finalDamage);
         }
     }
 
@@ -316,17 +333,21 @@ namespace ConsoleApp1
         {
         }
 
+        public override Fighter Copy()
+        {
+            return new Rogue(Armor, MaxHealth, Damage);
+        }
         public override void TakeDamage(int damage)
         {
-            if (UserUtils.GenerateRandomNumber(1,100) < _dodgeChance)
+            if (UserUtils.GenerateRandomNumber() < _dodgeChance)
             {
                 Console.WriteLine($"{TypeFighter}, уклонился повезет в следующий раз -_0");
-                return;  
+                return;
             }
             base.TakeDamage(damage);
         }
     }
-    
+
     class Ranger : Fighter
     {
         private const int _chanceHeadshot = 10;
@@ -335,13 +356,17 @@ namespace ConsoleApp1
         {
         }
 
+        public override Fighter Copy()
+        {
+            return new Ranger(Armor, MaxHealth, Damage);
+        }
         public override void Attack(Fighter enemy)
         {
-            if (UserUtils.GenerateRandomNumber(1, 100) < _chanceHeadshot)
+            if (UserUtils.GenerateRandomNumber() < _chanceHeadshot)
             {
                 Console.WriteLine("Сегодня везучий день для рейнджера и он бьет прямо в цель");
                 int finalDamage = (int)(Damage * _crietMultiplier);
-               enemy.TakeDamage(finalDamage);
+                enemy.TakeDamage(finalDamage);
             }
             else
             {
@@ -352,11 +377,24 @@ namespace ConsoleApp1
 
     class Monk : Fighter
     {
-
         private const int _heal = 100;
-        private  int _injuries = 0;
+
+        private int _injuries = 0;
+        private int _maxInjuries = 3;
+
         public Monk(int armor, int health, int damage) : base(armor, health, damage, "МОНАХ")
         {
+        }
+
+        public override Fighter Copy()
+        {
+            return new Monk(Armor, MaxHealth, Damage);
+        }
+
+        public override void Reset()
+        {
+            base.Reset();
+            _injuries = 0;
         }
 
         public override void Attack(Fighter enemy)
@@ -365,13 +403,12 @@ namespace ConsoleApp1
 
             _injuries++;
 
-            if (_injuries == 3)
+            if (_injuries == _maxInjuries)
             {
-               Heal(_heal);
+                Heal(_heal);
                 Console.WriteLine($"Монах медитирует и восстановил здоровье");
-                _injuries= 0;
+                _injuries = 0;
             }
-
         }
     }
 }

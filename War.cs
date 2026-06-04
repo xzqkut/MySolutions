@@ -19,7 +19,7 @@ namespace War
 
     interface IAttackStrategy
     {
-        void Attack(Soldier attacker, List<Soldier> enemies);
+        void Attack( int damage,List<Soldier> enemies);
     }
 
     class War
@@ -27,7 +27,8 @@ namespace War
         private Platoon _platoon1;
         private Platoon _platoon2;
 
-        public War() {
+        public War()
+        {
         }
 
         public void StartBattle()
@@ -35,7 +36,7 @@ namespace War
             SoldierFactory factory = new SoldierFactory();
 
             Console.WriteLine("Введите кол-во бойцов для 1 отряда");
-            int countFirstPlatoon = Convert.ToInt32(Console.ReadLine());
+            int countFirstPlatoon = ReadInt("Введите кол-во бойцов для 1 отряда");
             Console.WriteLine("Введите кол-во бойцов для 2 отряда");
             int countSecondPlatoon = Convert.ToInt32(Console.ReadLine());
 
@@ -45,48 +46,57 @@ namespace War
             Fight();
         }
 
+        private void ShowBattleResult()
+        {
+            if (_platoon1.HasSoldier&& !_platoon2.HasSoldier)
+            {
+                Console.WriteLine("Победил 1 отряд");
+            }
+            else if (!_platoon1.HasSoldier&&_platoon2.HasSoldier)
+            {
+                Console.WriteLine("победил 2 отряд");
+
+            }
+            else
+            {
+                Console.WriteLine("Ничья");
+            }
+        }
         private void Fight()
         {
             int round = 1;
             while (_platoon1.HasSoldier && _platoon2.HasSoldier)
             {
                 Console.WriteLine($"---Раунд{round}---");
-                _platoon1.Attack(_platoon2);
-                _platoon2 .Attack(_platoon1);
+                _platoon1.Attack(_platoon2.GetSoldiers());
+                _platoon2.Attack(_platoon1.GetSoldiers());
 
                 _platoon1.RemoveDead();
                 _platoon2.RemoveDead();
 
                 round++;
                 Console.ReadKey();
-
-                if (_platoon1.HasSoldier)
-                {
-                    Console.WriteLine("Победил 1 отряд");
-                }
-                else if (_platoon2.HasSoldier)
-                {
-                    Console.WriteLine("победил 2 отряд");
-
-                }
-                else
-                {
-                    Console.WriteLine("Ничья");
-                }
             }
+
+            ShowBattleResult();
         }
+
         private int ReadInt(string message)
         {
-            while (true)
+            int count;
+            bool isValid = true;
+            do
             {
                 Console.WriteLine(message);
-                if(int.TryParse(Console.ReadLine(), out int count))
+                string input = Console.ReadLine();
+                isValid = int.TryParse(input, out count);
+                if (!isValid)
                 {
-                    return count;
+                    Console.WriteLine("Ошибка ввода. Введите число");
                 }
-
-                Console.WriteLine("Ошибка ввода");
             }
+            while (!isValid);
+            return count;
         }
     }
 
@@ -101,8 +111,8 @@ namespace War
         }
 
         public bool HasSoldier => _soldiers.Count > 0;
-        
-        public void ShowPlatoon()
+
+        public void ShowInfo()
         {
             Console.WriteLine("Взвод:");
             foreach (var soldier in _soldiers)
@@ -113,7 +123,7 @@ namespace War
 
         public void RemoveDead()
         {
-            for(int i = _soldiers.Count - 1; i >= 0; i--)
+            for (int i = _soldiers.Count - 1; i >= 0; i--)
             {
                 if (_soldiers[i].IsAlive == false)
                 {
@@ -123,17 +133,17 @@ namespace War
             }
         }
 
-        public void Attack(Platoon enemy)
+        public void Attack(List<Soldier>enemies)
         {
             foreach (var soldier in _soldiers)
             {
-                soldier.Attack(enemy._soldiers);
+                soldier.Attack(enemies);
             }
         }
 
         public List<Soldier> GetSoldiers()
         {
-            return _soldiers;
+            return new List<Soldier>( _soldiers );
         }
     }
 
@@ -154,11 +164,11 @@ namespace War
         public int Armor { get; private set; }
         public string Name { get; private set; }
         public bool IsAlive => Health > 0;
-        
+
         public void Attack(List<Soldier> enemies)
         {
             Console.WriteLine($"{Name}, атакует!");
-            _attackStrategy.Attack(this, enemies);
+            _attackStrategy.Attack(Damage, enemies);
         }
 
         public void TakeDamage(int damage)
@@ -170,17 +180,33 @@ namespace War
                 finalDamage = 0;
             }
 
-            Health-= finalDamage;
+            Health -= finalDamage;
 
             Console.WriteLine($"{Name} получил {finalDamage} урона | осталось HP:{Health}");
+        }
+
+        public Soldier Clone()
+        {
+            return new Soldier(Name, Health, Damage, Armor, _attackStrategy);
         }
 
     }
 
     class SoldierFactory
     {
-        private static Random _random = new Random();
+        private List<Soldier> _templates;
 
+        public SoldierFactory()
+        {
+            _templates = new List<Soldier>()
+            {
+            new Soldier("Снайпер", 100, 50, 20, new PreciseAttack()),
+            new Soldier("Штурмовик", 200, 40, 30, new SingleAttack()),
+            new Soldier("Разведчик", 90, 50, 10, new StrongAttack()),
+            new Soldier("Пулеметчик", 250, 30, 30, new MultiAttack())
+            };
+
+        }
         public List<Soldier> CreateSquad(int count)
         {
             List<Soldier> squad = new List<Soldier>();
@@ -193,46 +219,31 @@ namespace War
 
         public Soldier CreateRandomSoldier()
         {
-            int type = _random.Next(4);
-
-            switch (type)
-            {
-                case 0:
-                    return new Soldier("Снайпер", 100, 50, 20, new PreciseAttack());
-                case 1:
-                    return new Soldier("Штурмовик", 200, 40, 30, new SingleAttack());
-                case 2:
-                    return new Soldier("Разведчик", 90, 50, 10, new StrongAttack());
-                case 3:
-                    return new Soldier("Пулеметчик", 250, 30, 30, new MultiAttack());
-                default:
-                    throw new Exception("Неизвестный тип бойца");
-            }
+            int index = UserUtils.GetRandomNumber(0,_templates.Count);
+            return _templates[index].Clone();
+           
         }
     }
 
     class SingleAttack : IAttackStrategy
     {
-        private static Random _random = new Random();
-        public void Attack(Soldier attacker, List<Soldier> enemies)
+        
+        public void Attack(int damage,List<Soldier> enemies)
         {
-            int index = _random.Next(enemies.Count);
+            
             if (enemies.Count == 0)
             {
                 return;
             }
-            else
-            {
-                enemies[index].TakeDamage(attacker.Damage);
-            }
+            int index = UserUtils.GetRandomNumber(0, enemies.Count);
+            enemies[index].TakeDamage(damage);
+            
         }
     }
 
     class MultiAttack : IAttackStrategy
     {
-        private static Random _randomTarget = new Random();
-
-        public void Attack(Soldier attacker, List<Soldier> enemies)
+        public void Attack(int damage, List<Soldier> enemies)
         {
             if (enemies.Count == 0)
             {
@@ -242,7 +253,8 @@ namespace War
             {
                 for (int i = 0; i < enemies.Count; i++)
                 {
-                    enemies[_randomTarget.Next(enemies.Count)].TakeDamage(attacker.Damage);
+                    int index = UserUtils.GetRandomNumber(0, enemies.Count);
+                    enemies[index].TakeDamage(damage);
                 }
             }
         }
@@ -250,17 +262,16 @@ namespace War
 
     class StrongAttack : IAttackStrategy
     {
-        private Random _randomTarget = new Random();
         private int _strongAttackMultiplier = 2;
-        public void Attack(Soldier attacker, List<Soldier> enemies)
+        public void Attack(int damage, List<Soldier> enemies)
         {
-            int doubleDamage = attacker.Damage * _strongAttackMultiplier;
+            int doubleDamage = damage * _strongAttackMultiplier;
             if (enemies.Count == 0)
             {
                 return;
             }
 
-            int index = _randomTarget.Next(enemies.Count);
+            int index = UserUtils.GetRandomNumber(0,enemies.Count);
             enemies[index].TakeDamage(doubleDamage);
 
             Console.WriteLine($"Был нанесен сокрушительный удар:{doubleDamage} урона");
@@ -269,21 +280,30 @@ namespace War
 
     class PreciseAttack : IAttackStrategy
     {
-        private static Random _random = new Random();
-
-        public void Attack(Soldier attacker, List<Soldier> enemies)
+        public void Attack(int damage, List<Soldier> enemies)
         {
             if (enemies.Count == 0)
             {
                 return;
             }
 
-            int index = _random.Next(enemies.Count);
+            int index = UserUtils.GetRandomNumber(0, enemies.Count);
 
-            var target = enemies[new Random().Next(enemies.Count)];
+            var target = enemies[index];
 
+            int damageDealt = target.Health;
             target.TakeDamage(target.Health);
-            Console.WriteLine($"Точный выстрел: {target.Health} урона по {target.Name}");
+            Console.WriteLine($"Точный выстрел: {damageDealt} урона по {target.Name}");
+        }
+    }
+
+    class UserUtils
+    {
+        private static Random s_random=new Random();
+
+        public static int GetRandomNumber(int min,int max)
+        {
+            return s_random.Next(min,max);
         }
     }
 }
